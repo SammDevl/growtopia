@@ -1,2 +1,2 @@
-# growtopia
+# Growtopia
 A Growtopia Script Repositories
