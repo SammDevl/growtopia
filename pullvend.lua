@@ -1,21 +1,31 @@
+
 local authorizedUsers = {
-    "pokesampink"
+	"pokesampink",
+	"pokesampink4"
 }
 
-local function checkAuthorization()
-    local currentUser = GetLocal().name
-    currentUser = currentUser:gsub("`.", "")
+local isAuthorized = false
+local currentUserName = ""
+
+local function initializeAuth()
+    currentUserName = GetLocal().name:gsub("`.", "")
     
     for _, authorizedUser in pairs(authorizedUsers) do
-        if currentUser == authorizedUser then
+        if currentUserName == authorizedUser then
+            isAuthorized = true
             return true
         end
     end
+    
+    isAuthorized = false
     return false
 end
 
--- Check authorization before running script
-if not checkAuthorization() then
+local function quickAuthCheck()
+    return isAuthorized
+end
+
+if not initializeAuth() then
     log("`4[ERROR] Unauthorized user! This script is locked to specific GrowIDs.")
     log("`4Contact the script owner for access.")
     
@@ -27,15 +37,14 @@ if not checkAuthorization() then
     var2[4] = 0
     var2.netid = -1
     SendVarlist(var2)
-    return -- Exit script
+    return
 end
 
--- Initialize variables
+
 local pulledPlayers = {}
 local pulledSet = {}
 local MAX_HISTORY = 100
 
--- Send authorized notification
 var2 = {}
 var2[0] = "OnAddNotification"
 var2[1] = "interface/cash_icon_overlay.rttex"
@@ -48,7 +57,7 @@ SendVarlist(var2)
 local items = "Dirt"
 local vendkontol = false
 
-log("`2[AUTHORIZED USER] `9Welcome, " .. GetLocal().name .. "!")
+log("`2[AUTHORIZED USER] `9Welcome, " .. currentUserName .. "!")
 log("`c/ap `9To Start AutoPulling")
 log("`c/item item name `9 To Change Item Target")
 log("`c/pulled `9To See All Pulled Player List")
@@ -63,10 +72,11 @@ else
 end
 
 local function add_pulled(name)
-    if name == "" then return end
-    if pulledSet[name] then return end 
+    if name == "" or pulledSet[name] then return end 
+    
     table.insert(pulledPlayers, name)
     pulledSet[name] = true
+    
     if #pulledPlayers > MAX_HISTORY then
         local old = table.remove(pulledPlayers, 1)
         if old then pulledSet[old] = nil end
@@ -74,10 +84,8 @@ local function add_pulled(name)
 end
 
 function venddc(varlist)
-    -- Runtime authorization check
-    if not checkAuthorization() then
-        log("`4[AUTH ERROR] Unauthorized access detected during runtime!")
-        vendkontol = false
+    if not quickAuthCheck() then
+        log("`4[AUTH ERROR] Session expired!")
         RemoveCallbacks()
         return
     end
@@ -95,15 +103,13 @@ function venddc(varlist)
 end
 
 function autopull(type, packet)
-    -- Runtime authorization check
-    if not checkAuthorization() then
-        log("`4[AUTH ERROR] Unauthorized access detected during runtime!")
-        vendkontol = false
-        RemoveCallbacks()
-        return true
-    end
-    
     if packet == "action|input\n|text|/ap" then
+        if not quickAuthCheck() then
+            log("`4[AUTH ERROR] Session expired!")
+            RemoveCallbacks()
+            return true
+        end
+        
         if vendkontol then
             vendkontol = false
             log("`cAutopull is `4OFF")
@@ -113,10 +119,7 @@ function autopull(type, packet)
         else
             log("`cAutopull is `2ON")
             function vendkontol(varlist)
-                -- Additional auth check inside nested function
-                if not checkAuthorization() then
-                    log("`4[AUTH ERROR] Security breach detected!")
-                    vendkontol = false
+                if not isAuthorized then
                     RemoveCallbacks()
                     return
                 end
@@ -125,8 +128,7 @@ function autopull(type, packet)
                     local z = varlist[1]
                     local s = "(.+)%s+bought"
                     local name = z:match(s)
-                    name = name:gsub("```9", "") 
-                    name = name:gsub("`7%[", "")
+                    name = name:gsub("```9", ""):gsub("`7%[", "")
                     if name ~= "" then
                         add_pulled(name)
                         SendPacket(2, "action|input\n|text|/pull " .. name)
@@ -143,17 +145,14 @@ end
 AddCallback("autopull", "OnPacket", autopull)
 
 function changeitem(type, packet)
-    -- Runtime authorization check
-    if not checkAuthorization() then
-        log("`4[AUTH ERROR] Unauthorized access detected during runtime!")
-        vendkontol = false
-        RemoveCallbacks()
-        return true
-    end
-    
     if packet:find("action|input\n|text|/item") then
-        items = packet:gsub("action|input\n|text|/item", "")
-        items = items:match("^%s*(.-)%s*$")
+        if not quickAuthCheck() then
+            log("`4[AUTH ERROR] Session expired!")
+            RemoveCallbacks()
+            return true
+        end
+        
+        items = packet:gsub("action|input\n|text|/item", ""):match("^%s*(.-)%s*$")
         log("`cChanged Item to:`9" .. items)
         return true
     end
@@ -161,25 +160,31 @@ end
 AddCallback("changeitem", "OnPacket", changeitem)
 
 function showpulled(type, packet)
-    -- Runtime authorization check
-    if not checkAuthorization() then
-        log("`4[AUTH ERROR] Unauthorized access detected during runtime!")
-        vendkontol = false
-        RemoveCallbacks()
-        return true
-    end
-    
     if packet:find("action|input\n|text|/clear") then
+        if not quickAuthCheck() then
+            log("`4[AUTH ERROR] Session expired!")
+            RemoveCallbacks()
+            return true
+        end
+        
         pulledPlayers = {}
         pulledSet = {}
         log("`4Pulled list cleared")
         return true
     end
+    
     if packet:find("action|input\n|text|/pulled") then
+        if not quickAuthCheck() then
+            log("`4[AUTH ERROR] Session expired!")
+            RemoveCallbacks()
+            return true
+        end
+        
         if #pulledPlayers == 0 then
             log("`cPulled list is empty.")
             return true
         end
+        
         log("`cPulled players (" .. #pulledPlayers .. "):")
         for i, name in ipairs(pulledPlayers) do
             log("`9" .. i .. ". `p" .. name)
@@ -190,15 +195,13 @@ end
 AddCallback("showpulled", "OnPacket", showpulled)
 
 function fc(type, packet)
-    -- Runtime authorization check
-    if not checkAuthorization() then
-        log("`4[AUTH ERROR] Unauthorized access detected during runtime!")
-        vendkontol = false
-        RemoveCallbacks()
-        return true
-    end
-    
     if packet:find("action|input\n|text|/fc") then
+        if not quickAuthCheck() then
+            log("`4[AUTH ERROR] Session expired!")
+            RemoveCallbacks()
+            return true
+        end
+        
         log("`4Autopull Closed")
         RemoveCallbacks()
         return true
