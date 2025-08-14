@@ -1,4 +1,3 @@
-
 local authorizedUsers = {
 	"pokesampink",
 	"pokesampink4"
@@ -173,7 +172,7 @@ function showpulled(type, packet)
         return true
     end
     
-    if packet:find("action|input\n|text|/pulled") then
+    if packet:find("action|input\n|text|/list") then
         if not quickAuthCheck() then
             log("`4[AUTH ERROR] Session expired!")
             RemoveCallbacks()
@@ -208,3 +207,4 @@ function fc(type, packet)
     end
 end
 AddCallback("fc", "OnPacket", fc)
+
