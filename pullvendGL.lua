@@ -1,3 +1,5 @@
+-- Only Works For Growlauncher
+
 local authorizedUsers = {
 "pokesampink"
 }
