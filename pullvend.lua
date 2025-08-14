@@ -1,3 +1,6 @@
+-- Only Works For Growpai
+
+
 local authorizedUsers = {
 	"pokesampink",
 	"pokesampink4"
