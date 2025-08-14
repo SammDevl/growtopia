@@ -1,0 +1,158 @@
+--This Script Only Work For Growlauncher
+--Script Created by Github: SammDevl, Discord: SmThing
+
+local authorizedUsers = {
+"pokesampink"
+}
+
+
+local function checkAuthorization()
+    local currentUser = getLocal().name
+    currentUser = currentUser:gsub("`.", "")
+    
+    for _, authorizedUser in pairs(authorizedUsers) do
+        if currentUser == authorizedUser then
+            return true
+        end
+    end
+    return false
+end
+
+if not checkAuthorization() then
+    LogToConsole("`4[ERROR] Unauthorized user! This script is locked to specific GrowIDs.")
+    LogToConsole("`4Contact the script owner for access.")
+    sendVariant({
+        v1 = "OnAddNotification",
+        v2 = "interface/atomic_button.rttex",
+        v3 = "`4Unauthorized Access Detected!",
+        v4 = "audio/fail.wav",
+        v5 = 0
+    })
+    return
+end
+
+local pulledPlayers = {}
+local pulledSet = {}
+local MAX_HISTORY = 100
+local items = "Dirt"
+local vendkontol = false
+
+-- Send notification using new API
+sendVariant({
+    v1 = "OnAddNotification",
+    v2 = "interface/cash_icon_overlay.rttex",
+    v3 = "`2[AUTHORIZED] `cScript Created by `pDiscord: SmThing `5Github: sammdevl",
+    v4 = "audio/achievement.wav",
+    v5 = 0
+})
+
+LogToConsole("`2[AUTHORIZED USER] `9Welcome, " .. getLocal().name .. "!")
+
+LogToConsole("`c/ap `9To Start AutoPulling")
+LogToConsole("`c/item item name `9 To Change Item Target")
+LogToConsole("`c/pulled `9To See All Pulled Player List")
+LogToConsole("`c/clear `9To Clear All Pulled Player List")
+LogToConsole("`c/item `2item name `9 To Change Item Target")
+LogToConsole("`cCurrent Item: `9" .. items)
+
+if vendkontol then
+    LogToConsole("`cAutopull is `2ON")
+else
+    LogToConsole("`cAutopull is `4OFF")
+end
+
+local function add_pulled(name)
+    if name == "" then return end
+    if pulledSet[name] then return end 
+    table.insert(pulledPlayers, name)
+    pulledSet[name] = true
+    if #pulledPlayers > MAX_HISTORY then
+        local old = table.remove(pulledPlayers, 1)
+        if old then pulledSet[old] = nil end
+    end
+end
+
+function OnVariant(varlist)
+    if not checkAuthorization() then
+        LogToConsole("`4[AUTH ERROR] Unauthorized access detected during runtime!")
+        vendkontol = false
+        return
+    end
+    
+    if varlist.v1 == "OnConsoleMessage" and (varlist.v2:find("dc") or varlist.v2:find("DC")) then
+        local z = varlist.v2
+        local name = z:match("`w(%w+)`")
+        if name and pulledSet[name] then
+            LogToConsole("`6Pulling DC player: `p" .. name .. " `6(from pulled list)")
+            sendPacket(2, "action|input\n|text|/pull " .. name)
+        elseif name then
+            LogToConsole("`4Player `p" .. name .. " `4DCed but not in pulled list - ignoring")
+        end
+    end
+    
+    if vendkontol and varlist.v1 == "OnConsoleMessage" and varlist.v2:find("bought") and varlist.v2:find(items) then
+        local z = varlist.v2
+        local s = "(.+)%s+bought"
+        local name = z:match(s)
+        name = name:gsub("```9", "") 
+        name = name:gsub("`7%[", "")
+        if name ~= "" then
+            add_pulled(name)
+            sendPacket(2, "action|input\n|text|/pull " .. name)
+        end
+    end
+end
+
+function OnSendPacket(type, packet)
+    if not checkAuthorization() then
+        LogToConsole("`4[AUTH ERROR] Unauthorized access detected during runtime!")
+        vendkontol = false
+        return true
+    end
+    if packet == "action|input\n|text|/ap" then
+        if vendkontol then
+            vendkontol = false
+            LogToConsole("`cAutopull is `4OFF")
+            return true
+        else
+            LogToConsole("`cAutopull is `2ON")
+            vendkontol = true
+            return true
+        end
+    end
+    
+    if packet:find("action|input\n|text|/item") then
+        items = packet:gsub("action|input\n|text|/item", "")
+        items = items:match("^%s*(.-)%s*$")
+        LogToConsole("`cChanged Item to:`9" .. items)
+        return true
+    end
+    
+    if packet:find("action|input\n|text|/clear") then
+        pulledPlayers = {}
+        pulledSet = {}
+        LogToConsole("`4Pulled list cleared")
+        return true
+    end
+    
+    if packet:find("action|input\n|text|/pulled") then
+        if #pulledPlayers == 0 then
+            LogToConsole("`cPulled list is empty.")
+            return true
+        end
+        LogToConsole("`cPulled players (" .. #pulledPlayers .. "):")
+        for i, name in ipairs(pulledPlayers) do
+            LogToConsole("`9" .. i .. ". `p" .. name)
+        end
+        return true
+    end
+   
+    if packet:find("action|input\n|text|/fc") then
+        LogToConsole("`4Autopull Closed")
+        vendkontol = false
+        return true
+    end
+end
+
+addHook(OnVariant, "onVariant")
+addHook(OnSendPacket, "onSendPacket")
